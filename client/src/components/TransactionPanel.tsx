@@ -90,19 +90,25 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
         console.log('Fetched transaction data:', data?.length, 'records');
       }
 
-      // Transform the data to match our interface
-      const transformedData = data?.map(expense => ({
-        id: expense.id,
-        item_name: expense.item_name,
-        amount: expense.amount,
-        expense_date: expense.expense_date,
-        category_id: expense.category_id,
-        recurrence: expense.recurrence,
-        category: {
-          name: expense.categories.name,
-          emoji: expense.categories.emoji
-        }
-      })) || [];
+      // Transform the data to match our interface. Handle array/object join shapes.
+      type ExpenseJoin = typeof data extends (infer U)[] ? U : any;
+      const transformedData: Transaction[] = (data ?? []).map((expense: ExpenseJoin) => {
+        const joinedCategory = Array.isArray(expense.categories)
+          ? expense.categories[0]
+          : expense.categories;
+        return {
+          id: expense.id,
+          item_name: expense.item_name,
+          amount: expense.amount,
+          expense_date: expense.expense_date,
+          category_id: expense.category_id,
+          recurrence: expense.recurrence,
+          category: {
+            name: joinedCategory?.name ?? '',
+            emoji: joinedCategory?.emoji ?? ''
+          }
+        };
+      });
 
       if (import.meta.env.DEV) {
         console.log('Transformed transaction data:', transformedData.length, 'records');
