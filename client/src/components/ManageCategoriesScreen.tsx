@@ -59,35 +59,16 @@ const AddCategoryScreen: React.FC<AddCategoryScreenProps> = ({ isOpen, onClose, 
         return;
       }
 
-      // Create new category - try with user_id first, fallback without it
-      let insertError = null;
-      
-      try {
-        const { error } = await supabase
-          .from('categories')
-          .insert({ 
-            name: name.trim(), 
-            emoji: emoji.trim(),
-            user_id: user.id
-          });
-        insertError = error;
-      } catch (err) {
-        insertError = err;
-      }
+      // Create new category with required user_id
+      const { error: insertError } = await supabase
+        .from('categories')
+        .insert({ 
+          name: name.trim(), 
+          emoji: emoji.trim(),
+          user_id: user.id
+        });
 
-      // If user_id column doesn't exist, try without it
-      if (insertError && (insertError as any).code === 'PGRST204') {
-        const { error: fallbackError } = await supabase
-          .from('categories')
-          .insert({ 
-            name: name.trim(), 
-            emoji: emoji.trim()
-          });
-        
-        if (fallbackError) {
-          throw fallbackError;
-        }
-      } else if (insertError) {
+      if (insertError) {
         throw insertError;
       }
 
@@ -227,31 +208,14 @@ const EditCategoryModal: React.FC<EditCategoryModalProps> = ({ isOpen, onClose, 
         return;
       }
 
-      // Update existing category - try with user_id filter first, fallback without it
-      let updateError = null;
-      
-      try {
-        const { error } = await supabase
-          .from('categories')
-          .update({ name: name.trim(), emoji: emoji.trim() })
-          .eq('id', category.id)
-          .eq('user_id', user.id);
-        updateError = error;
-      } catch (err) {
-        updateError = err;
-      }
+      // Update existing category scoped to user
+      const { error: updateError } = await supabase
+        .from('categories')
+        .update({ name: name.trim(), emoji: emoji.trim() })
+        .eq('id', category.id)
+        .eq('user_id', user.id);
 
-      // If user_id column doesn't exist, try without the user_id filter
-      if (updateError && (updateError as any).code === '42703') {
-        const { error: fallbackError } = await supabase
-          .from('categories')
-          .update({ name: name.trim(), emoji: emoji.trim() })
-          .eq('id', category.id);
-        
-        if (fallbackError) {
-          throw fallbackError;
-        }
-      } else if (updateError) {
+      if (updateError) {
         throw updateError;
       }
 
@@ -361,7 +325,7 @@ const ManageCategoriesScreen: React.FC<ManageCategoriesScreenProps> = ({ isOpen,
         return;
       }
 
-      // Try to fetch categories with user_id filter
+      // Fetch categories strictly scoped to user
       const { data, error: fetchError } = await supabase
         .from('categories')
         .select('*')
@@ -369,22 +333,6 @@ const ManageCategoriesScreen: React.FC<ManageCategoriesScreenProps> = ({ isOpen,
         .order('name');
 
       if (fetchError) {
-        // If user_id column doesn't exist, try fetching all categories
-        if (fetchError.code === '42703') {
-          console.log('user_id column not found, fetching all categories');
-          const { data: allData, error: allError } = await supabase
-            .from('categories')
-            .select('*')
-            .order('name');
-          
-          if (allError) {
-            throw allError;
-          }
-          
-          setCategories(allData || []);
-          setError('Database needs setup. Categories table is missing user_id column.');
-          return;
-        }
         throw fetchError;
       }
 

@@ -65,7 +65,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
         return;
       }
 
-      // CRITICAL FIX: Remove .limit() to fetch ALL transactions
+      // Fetch recent transactions with a reasonable limit; paginate later
       const { data, error } = await supabase
         .from('expenses')
         .select(`
@@ -81,12 +81,14 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
           )
         `)
         .eq('user_id', user.id)
-        .order('expense_date', { ascending: false });
-        // REMOVED: .limit(50) - now fetches all transactions
+        .order('expense_date', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
-      console.log('Fetched ALL transaction data:', data?.length, 'records'); // Debug log
+      if (import.meta.env.DEV) {
+        console.log('Fetched transaction data:', data?.length, 'records');
+      }
 
       // Transform the data to match our interface
       const transformedData = data?.map(expense => ({
@@ -102,7 +104,9 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
         }
       })) || [];
 
-      console.log('Transformed transaction data:', transformedData.length, 'records'); // Debug log
+      if (import.meta.env.DEV) {
+        console.log('Transformed transaction data:', transformedData.length, 'records');
+      }
       setTransactions(transformedData);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -183,7 +187,9 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
   };
 
   const handleTransactionClick = (transaction: Transaction) => {
-    console.log('Transaction clicked:', transaction); // Debug log
+    if (import.meta.env.DEV) {
+      console.log('Transaction clicked:', transaction);
+    }
     // Pass the complete transaction data to the parent for editing
     onEditTransaction(transaction);
   };
