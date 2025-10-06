@@ -65,7 +65,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
         return;
       }
 
-      // CRITICAL FIX: Remove .limit() to fetch ALL transactions
+      // Fetch recent transactions with a reasonable limit; paginate later
       const { data, error } = await supabase
         .from('expenses')
         .select(`
@@ -81,28 +81,38 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
           )
         `)
         .eq('user_id', user.id)
-        .order('expense_date', { ascending: false });
-        // REMOVED: .limit(50) - now fetches all transactions
+        .order('expense_date', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
-      console.log('Fetched ALL transaction data:', data?.length, 'records'); // Debug log
+      if (import.meta.env.DEV) {
+        console.log('Fetched transaction data:', data?.length, 'records');
+      }
 
-      // Transform the data to match our interface
-      const transformedData = data?.map(expense => ({
-        id: expense.id,
-        item_name: expense.item_name,
-        amount: expense.amount,
-        expense_date: expense.expense_date,
-        category_id: expense.category_id,
-        recurrence: expense.recurrence,
-        category: {
-          name: expense.categories.name,
-          emoji: expense.categories.emoji
-        }
-      })) || [];
+      // Transform the data to match our interface. Handle array/object join shapes.
+      type ExpenseJoin = typeof data extends (infer U)[] ? U : any;
+      const transformedData: Transaction[] = (data ?? []).map((expense: ExpenseJoin) => {
+        const joinedCategory = Array.isArray(expense.categories)
+          ? expense.categories[0]
+          : expense.categories;
+        return {
+          id: expense.id,
+          item_name: expense.item_name,
+          amount: expense.amount,
+          expense_date: expense.expense_date,
+          category_id: expense.category_id,
+          recurrence: expense.recurrence,
+          category: {
+            name: joinedCategory?.name ?? '',
+            emoji: joinedCategory?.emoji ?? ''
+          }
+        };
+      });
 
-      console.log('Transformed transaction data:', transformedData.length, 'records'); // Debug log
+      if (import.meta.env.DEV) {
+        console.log('Transformed transaction data:', transformedData.length, 'records');
+      }
       setTransactions(transformedData);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -183,7 +193,9 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose, on
   };
 
   const handleTransactionClick = (transaction: Transaction) => {
-    console.log('Transaction clicked:', transaction); // Debug log
+    if (import.meta.env.DEV) {
+      console.log('Transaction clicked:', transaction);
+    }
     // Pass the complete transaction data to the parent for editing
     onEditTransaction(transaction);
   };

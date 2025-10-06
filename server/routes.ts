@@ -3,12 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createClient } from '@supabase/supabase-js';
 
-// Debug: Check available environment variables
-console.log('Available environment variables:', {
-  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
-  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Missing'
-});
+// Debug: Check available environment variables (dev only)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Available environment variables:', {
+    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
+    VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing',
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Missing'
+  });
+}
 
 // Try to get Supabase URL from environment or fallback
 let supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -20,10 +22,12 @@ if (!supabaseUrl) {
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Create admin Supabase client only if we have the required credentials
-let supabaseAdmin: any = null;
+let supabaseAdmin: ReturnType<typeof createClient> | null = null;
 
 if (supabaseUrl && serviceRoleKey) {
-  console.log('Creating Supabase admin client with service role key');
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Creating Supabase admin client with service role key');
+  }
   supabaseAdmin = createClient(
     supabaseUrl,
     serviceRoleKey,
@@ -54,19 +58,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'Supabase admin client not available' });
       }
 
-      console.log('Setting up database tables...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Setting up database tables...');
+      }
 
       // Try to create tables using direct table insertion to test if they exist
       try {
         // Test if categories table exists by trying to read from it
         const { data, error } = await supabaseAdmin.from('categories').select('id').limit(1);
         if (error && error.code === '42P01') {
-          console.log('Categories table does not exist - will be created via Supabase UI');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Categories table does not exist - will be created via Supabase UI');
+          }
         } else {
-          console.log('Categories table already exists');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Categories table already exists');
+          }
         }
       } catch (err) {
-        console.log('Categories table check failed:', err);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Categories table check failed:', err);
+        }
       }
 
       res.json({ 
@@ -97,10 +109,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log('Server: User deletion requested for:', userId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Server: User deletion requested for:', userId);
+      }
       
       // Delete user data from database tables first
-      console.log('Server: Deleting user expenses...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Server: Deleting user expenses...');
+      }
       const { error: expensesError } = await supabaseAdmin
         .from('expenses')
         .delete()
@@ -110,7 +126,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Server: Error deleting expenses:', expensesError);
       }
 
-      console.log('Server: Deleting user budgets...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Server: Deleting user budgets...');
+      }
       const { error: budgetsError } = await supabaseAdmin
         .from('budgets')
         .delete()
@@ -121,7 +139,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Delete the user from Supabase Auth using admin privileges
-      console.log('Server: Deleting user from Supabase Auth...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Server: Deleting user from Supabase Auth...');
+      }
       const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       
       if (deleteUserError) {
@@ -129,7 +149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'Failed to delete user account', details: deleteUserError.message });
       }
 
-      console.log('Server: User account and all data deleted successfully');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Server: User account and all data deleted successfully');
+      }
       res.json({ success: true, message: 'User account and all data deleted successfully' });
       
     } catch (error) {
